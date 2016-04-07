@@ -1,0 +1,11 @@
+# This file provides instructions for packaging.
+
+@prefix : <http://ontologi.es/doap-deps#>.
+
+`AtteanX-Store-Virtuoso`
+	:runtime-requirement    [ :on "Moo 1.000000"^^:CpanId ];
+	:runtime-requirement    [ :on "Types::Standard 0.022"^^:CpanId ];
+	:runtime-requirement    [ :on "namespace::sweep 0.006"^^:CpanId ];
+	:test-requirement       [ :on "Test::More 0.96"^^:CpanId ];
+	:develop-recommendation [ :on "Dist::Inkt 0.001"^^:CpanId ];
+	.
