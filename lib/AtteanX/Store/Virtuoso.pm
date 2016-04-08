@@ -1,4 +1,3 @@
-COMMENCE module
 use 5.010001;
 use strict;
 use warnings;
@@ -11,6 +10,8 @@ our $VERSION   = '0.001';
 use Moo;
 use Types::Standard -types;
 use namespace::sweep;
+use Carp;
+use DBI;
 
 with 'Attean::API::QuadStore';
 with 'MooX::Log::Any';
@@ -19,20 +20,20 @@ has 'dsn' => (is => 'ro', required => 1, isa => Str);
 has 'dbuser' => (is => 'ro', isa => Str, default => 'dba');
 has 'dbpasswd' => (is => 'ro', isa => Str, default => 'dba');
 
-has '_dbh' => (is => 'lazy');
+has '_dbh' => (is => 'lazy' isa => InstanceOf['DBI::db']);
 
 has 'turtle_files' => (is => 'lazy', isa => ArrayRef[Str]);
 
-has 'graph' => (is => 'ro', isa => InstanceOf[Attean::IRI])
+has 'graph' => (is => 'ro', isa => InstanceOf['Attean::IRI'], coerce => 1);
 
-has 'base_uri' => (is => 'ro', isa => InstanceOf[Attean::IRI]);
+has 'base_uri' => (is => 'ro', isa => InstanceOf['Attean::IRI'], coerce => 1);
 
 has 'parse_flags' => (is => 'ro', isa => Int);
 
 sub BUILD {
 	my ($self, $args) = @_;
 	$self->_dbh; # Connect to the database
-	if ($args->{turtle_files} {
+	if ($args->{turtle_files}) {
 		$self->turtle_files;
 	}
 }
@@ -41,9 +42,8 @@ sub _build__dbh {
 	my $self = shift;
 	$self->log->debug('Connecting to Virtuoso database with DSN: \'dbi:ODBC:DSN=' . $self->dsn . '\', Username: \'' . $self->dbuser . '\', Password: \'', $self->dbpasswd);
 	my $dbh = DBI->connect('dbi:ODBC:DSN=' . $self->dsn, $self->dbuser, $self->dbpasswd);
-	warn ref($dbh);
 	unless ($dbh) {
-		croak 'Couldn\'t connect to database: ' . DBI->errstr;
+		croak "Couldn't connect to database: " . DBI->errstr;
 	}
 	return $dbh;
 }

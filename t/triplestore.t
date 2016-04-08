@@ -25,6 +25,7 @@ use warnings;
 use Test::More;
 use Test::Roo;
 use Attean;
+use File::Temp qw(tempfile);
 
 with 'Test::Attean::QuadStore';
 
@@ -33,9 +34,13 @@ sub create_store {
 	my %args = @_;
 	my $quads = $args{quads} // [];
 	my $ser = Attean->get_serializer('NQuads')->new();
-	my $data = $ser->serialize_list_to_bytes(@$quads);
-	my $store = Attean->get_store('Virtuoso')->new(dsn => 'VOSTMP',
-																 turtle_files => #TODO: need tmpfile);
+	my ($fh, $filename) = tempfile;
+	binmode( $fh, ":utf8" );
+	$ser->serialize_list_to_io($fh, @$quads);
+	$fh->close;
+	return Attean->get_store('Virtuoso')->new(dsn => 'VOSTMP',
+															turtle_files => [$filename]);
+}
 
 run_me;
 
