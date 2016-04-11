@@ -45,7 +45,7 @@ sub BUILD {
 			$sql .= ", " . $self->parse_flags;
 		}
 		$sql .= ")";
-		warn $sql;
+		$self->log->trace("Reading Turtle/N-Quads into Virtuoso using query $sql");
 		$self->_dbh->do($sql);
 	}
 }
@@ -53,7 +53,7 @@ sub BUILD {
 sub _build__dbh {
 	my $self = shift;
 	$self->log->debug('Connecting to Virtuoso database with DSN: \'dbi:ODBC:DSN=' . $self->dsn . '\', Username: \'' . $self->dbuser . '\', Password: \'', $self->dbpasswd);
-	my $dbh = DBI->connect('dbi:ODBC:DSN=' . $self->dsn, $self->dbuser, $self->dbpasswd);
+	my $dbh = DBI->connect('dbi:ODBC:DSN=' . $self->dsn, $self->dbuser, $self->dbpasswd, { LongReadLen => 5000, LongTruncOk => 1 } ); # TODO: May need changing
 	unless ($dbh) {
 		croak "Couldn't connect to database: " . DBI->errstr;
 	}
@@ -96,6 +96,7 @@ END
 
 sub _get_quad {
 	my ($self, %row) = @_;
+	warn Data::Dumper::Dumper(\%row);
 	my $s;
 	my $p = iri($row{p});
 	my $o;
@@ -125,6 +126,15 @@ sub _get_quad {
 	return quad($s, $p, $o, $g);
 }
 
+sub size {
+	my $self = shift;
+	my $sqlquery = <<'END';
+SELECT count(*) FROM DB.DBA.RDF_QUAD
+END
+	my $size = $self->_dbh->selectall_arrayref($sqlquery);
+	warn Data::Dumper::Dumper($size);
+	return $size;
+}
 
 1;
 
