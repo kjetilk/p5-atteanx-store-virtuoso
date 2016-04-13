@@ -32,7 +32,7 @@ has 'base_uri' => (is => 'ro', isa => InstanceOf['Attean::IRI'], predicate => 1,
 
 has 'parse_flags' => (is => 'ro', isa => Int, predicate => 1, default => 512);
 
-has '_internal_graphs' => (is => 'ro', isa => Str, default => "NOT G IN (   __i2idn ( __bft('http://www.w3.org/ns/ldp#')) ,  __i2idn ( __bft('http://localhost:8890/DAV/')), __i2idn ( __bft('http://localhost:8890/sparql')), __i2idn ( __bft('http://www.openlinksw.com/schemas/virtrdf#')))");
+has '_internal_graphs' => (is => 'ro', isa => Str, default => "NOT G IN ( __i2idn ( __bft('http://www.w3.org/ns/ldp#')),\n\t           __i2idn ( __bft('http://localhost:8890/DAV/')),\n\t           __i2idn ( __bft('http://localhost:8890/sparql')),\n\t           __i2idn ( __bft('http://www.openlinksw.com/schemas/virtrdf#')))");
 
 sub BUILD {
 	my ($self, $args) = @_;
@@ -65,21 +65,60 @@ sub _build__dbh {
 
 sub get_quads {
 	my $self = shift;
-	my $sqlquery = <<'END';
-SELECT __id2i ( "s_1_1-t0"."S" ) AS "s",
-  1 AS "sisiri",
-  is_bnode_iri_id ( "s_1_1-t0"."S" ) AS "sisblank",
-  __id2i ( "s_1_1-t0"."P" ) AS "p",
-  __ro2sq ( "s_1_1-t0"."O" ) AS "o",
-  is_named_iri_id ( "s_1_1-t0"."O" ) AS "oisiri",
-  is_bnode_iri_id ( "s_1_1-t0"."O" ) AS "oisblank",
-  (1 - isiri_id ( "s_1_1-t0"."O" )) AS "oisliteral",
-  __rdf_sqlval_of_obj /*l*/ ( DB.DBA.RDF_DATATYPE_OF_OBJ (__ro2sq ( "s_1_1-t0"."O" ))) AS "datatype",
-  DB.DBA.RDF_LANGUAGE_OF_OBJ (__ro2sq ( "s_1_1-t0"."O" )) AS "lang",
-  __id2i ( "s_1_1-t0"."G" ) AS "g"
-FROM DB.DBA.RDF_QUAD AS "s_1_1-t0"
-OPTION (QUIETCAST)
-END
+	my ($s, $p, $o, $g) = @_;
+	my ($sout, $pout, $oout, $gout) = ($s, $p, $o, $g);
+	my @proj;
+	my @where;
+	if ((!(defined($s)) || $s->is_variable || $s->is_blank)) {
+		push(@proj, ('__id2i ( "S" ) AS "s"', 'is_bnode_iri_id ( "S" ) AS "sisblank"'));
+	} else {
+		# Bound IRI assumed
+		push(@where, '"S" = __i2idn ( __bft( ' . $s->value . '))');
+	}
+	if ((!(defined($p)) || $p->is_variable || $p->is_blank)) {
+		push(@proj, '__id2i ( "P" ) AS "p"');
+	} else {
+		# Bound IRI assumed
+		push(@where, '"P" = __i2idn ( __bft( ' . $p->value . '))');
+	}
+	if ((!(defined($o)) || $o->is_variable || $o->is_blank)) {
+		push(@proj, ('__ro2sq ( "O" ) AS "o"',
+						 'is_named_iri_id ( "O" ) AS "oisiri"',
+						 'is_bnode_iri_id ( "O" ) AS "oisblank"',
+						 '(1 - isiri_id ( "O" )) AS "oisliteral"',
+						 '__rdf_sqlval_of_obj /*l*/ ( DB.DBA.RDF_DATATYPE_OF_OBJ (__ro2sq ( "O" ))) AS "datatype"',
+						 'DB.DBA.RDF_LANGUAGE_OF_OBJ (__ro2sq ( "O" )) AS "lang"'));
+	} else {
+		# TODO: RDF 1.1 vs RDF 1.0 is unclear here, assuming no plain literals
+		my $wo = '"O" = ';
+		if($o->has_language) {
+			$wo .= 'DB.DBA.RDF_MAKE_OBJ_OF_TYPEDSQLVAL ( \'' . $o->value .'\' , __i2id( NULL),  \'' . $o->language .'\' )';
+		} else {
+# TODO: This might speed up, but not sure
+#			if ($o->datatype->equals(iri('http://www.w3.org/2001/XMLSchema#integer')) || $o->datatype->equals(iri('http://www.w3.org/2001/XMLSchema#decimal')) {
+#				$wo .= $o->value;
+#			} else {
+			$wo .= 'DB.DBA.RDF_MAKE_OBJ_OF_TYPEDSQLVAL ( \'' . $o->value .'\' , __i2id( UNAME\'' . $o->datatype->value . '\' ),  NULL)';
+#			}
+		}
+		push(@where, $wo);
+	}
+	if ((!(defined($g)) || $g->is_variable || $g->is_blank)) {
+		push(@proj, '__id2i ( "G" ) AS "g"');
+	} else {
+		# Bound IRI assumed
+		push(@where, '"G" = __i2idn ( __bft( ' . $g->value . '))');
+	}
+
+	my $sqlquery = "SELECT\n\t" . join(",\n\t", @proj) . "\nFROM DB.DBA.RDF_QUAD\nWHERE\n\t";
+	if (scalar @where > 0) {
+		$sqlquery .= join("\nAND\n\t", @where);
+		$sqlquery .= "\nAND\n\t";
+	}
+	$sqlquery .= $self->_internal_graphs;
+	$sqlquery .= "\nOPTION (QUIETCAST)\n";
+
+	$self->log->debug("Preparing query:\n$sqlquery");
 	my $sth = $self->_dbh->prepare($sqlquery);
 		$sth->execute();
 		my $ok	= 1;

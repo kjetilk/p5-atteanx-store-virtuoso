@@ -26,6 +26,8 @@ use Test::More;
 use Test::Roo;
 use Attean;
 use File::Temp qw(tempfile);
+use Log::Any::Adapter;
+Log::Any::Adapter->set($ENV{LOG_ADAPTER}) if ($ENV{LOG_ADAPTER});
 
 with 'Test::Attean::QuadStore';
 
@@ -41,6 +43,11 @@ sub create_store {
 	return Attean->get_store('Virtuoso')->new(dsn => 'VOSTMP',
 															turtle_files => [$filename]);
 }
+
+before 'cleanup_store' => sub {
+	my ($self, $store) = @_;
+	$store->_dbh->do("DELETE FROM DB.DBA.RDF_QUAD WHERE G " . $store->_internal_graphs);
+};
 
 run_me;
 
