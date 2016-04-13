@@ -32,11 +32,7 @@ has 'base_uri' => (is => 'ro', isa => InstanceOf['Attean::IRI'], predicate => 1,
 
 has 'parse_flags' => (is => 'ro', isa => Int, predicate => 1, default => 512);
 
-has '_internal_graphs' => (is => 'ro', isa => ArrayRef[Str], 
-									default => sub { return ['http://www.w3.org/ns/ldp#',
-																	 'http://localhost:8890/DAV/',
-																	 'http://localhost:8890/sparql',
-																	 'http://www.openlinksw.com/schemas/virtrdf#']});
+has '_internal_graphs' => (is => 'ro', isa => Str, default => "NOT G IN (   __i2idn ( __bft('http://www.w3.org/ns/ldp#')) ,  __i2idn ( __bft('http://localhost:8890/DAV/')), __i2idn ( __bft('http://localhost:8890/sparql')), __i2idn ( __bft('http://www.openlinksw.com/schemas/virtrdf#')))");
 
 sub BUILD {
 	my ($self, $args) = @_;
@@ -82,10 +78,8 @@ SELECT __id2i ( "s_1_1-t0"."S" ) AS "s",
   DB.DBA.RDF_LANGUAGE_OF_OBJ (__ro2sq ( "s_1_1-t0"."O" )) AS "lang",
   __id2i ( "s_1_1-t0"."G" ) AS "g"
 FROM DB.DBA.RDF_QUAD AS "s_1_1-t0"
-WHERE
+OPTION (QUIETCAST)
 END
-#	$sqlquery .= $self->_internal_graphs . "\nOPTION (QUIETCAST)\n";
-	warn $sqlquery;
 	my $sth = $self->_dbh->prepare($sqlquery);
 		$sth->execute();
 		my $ok	= 1;
@@ -104,7 +98,7 @@ END
 
 sub _get_quad {
 	my ($self, %row) = @_;
-#	warn Data::Dumper::Dumper(\%row);
+	warn Data::Dumper::Dumper(\%row);
 	my $s;
 	my $p = iri($row{p});
 	my $o;
@@ -136,9 +130,7 @@ sub _get_quad {
 
 sub size {
 	my $self = shift;
-	my $sqlquery = 'SELECT count(*) FROM DB.DBA.RDF_QUAD WHERE G NOT IN (__i2idn ( __bft(\''
-	  . join('\')) ,  __i2idn ( __bft(\'', @{$self->_internal_graphs})
-	  . '\')))';
+	my $sqlquery = 'SELECT count(*) FROM DB.DBA.RDF_QUAD WHERE ' . $self->_internal_graphs;
 	my ($size) = $self->_dbh->selectrow_array($sqlquery);
 	return $size;
 }
