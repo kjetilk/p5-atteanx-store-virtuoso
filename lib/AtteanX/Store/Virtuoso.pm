@@ -135,6 +135,24 @@ sub get_quads {
 	return $iter;
 }
 
+sub get_graphs {
+	my $self = shift;
+	my $sth = $self->_dbh->prepare('SELECT DISTINCT __id2i ( "G" ) AS "g" FROM DB.DBA.RDF_QUAD WHERE ' . $self->_internal_graphs);
+	$sth->execute();
+	my $ok	= 1;
+	my $sub	= sub {
+		return unless ($ok);
+		if (my $row	= $sth->fetchrow_hashref) {
+			return iri($row->{g});
+		}
+		$ok = 0;
+		return;
+	};
+	my $iter	= Attean::CodeIterator->new( generator => $sub, item_type => 'Attean::API::Term' );
+	return $iter;
+}
+
+
 sub _get_quad {
 	my $self = shift;
 #	warn Data::Dumper::Dumper(\@_);
