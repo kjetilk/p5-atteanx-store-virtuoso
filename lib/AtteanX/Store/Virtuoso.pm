@@ -65,8 +65,8 @@ sub _build__dbh {
 
 sub get_quads {
 	my $self = shift;
-	my ($s, $p, $o, $g) = @_;
-	my ($sout, $pout, $oout, $gout) = ($s, $p, $o, $g);
+	my @out = @_;
+	my ($s, $p, $o, $g) = @out;
 	my @proj;
 	my @where;
 	if ((!(defined($s)) || $s->is_variable || $s->is_blank)) {
@@ -125,7 +125,7 @@ sub get_quads {
 		my $sub	= sub {
 			return unless ($ok);
 			if (my $row	= $sth->fetchrow_hashref) {
-				return $self->_get_quad(%$row);
+				return $self->_get_quad(@out, %$row);
 			}
 			$ok = 0;
 			return;
@@ -136,33 +136,42 @@ sub get_quads {
 }
 
 sub _get_quad {
-	my ($self, %row) = @_;
+	my ($self, $s, $p, $o, $g, %row) = @_;
+	# The idea here is that if the row returned from the database
+	# contains an entry for each of the subject, predicate, object or
+	# graph, then it has been a result of a variable, and so that is
+	# what we will return. If it isn't, then we have a bound term,
+	# which has been passed in the @out array to this method, and then
+	# we can reuse that object
+
 	warn Data::Dumper::Dumper(\%row);
-	my $s;
-	my $p = iri($row{p});
-	my $o;
-	my $g = iri($row{g}) || $self->graph;
-	if ($row{sisiri}) {
-		$s = iri($row{s});
-	} elsif ($row{sisblank}) {
-		$s = blank($row{s});
-	} else {
-		croak "Subject $row{s} is neither IRI nor blank";
-	}
-	if ($row{oisiri}) {
-		$o = iri($row{o});
-	} elsif ($row{oisliteral}) {
-		if ($row{datatype}) {
-			$o = dtliteral($row{o}, $row{datatype});
-		} elsif ($row{lang}) {
-			$o = langliteral($row{o}, $row{lang});
+	if ($row{s}) {
+		if ($row{sisblank}) {
+			$s = blank($row{s});
 		} else {
-			$o = literal($row{o});
-		} # TODO: croak if both datatype and language
-	} elsif ($row{oisblank}) {
-		$o = blank($row{o});
-	} else {
-		croak "Subject $row{o} is neither IRI, literal nor blank";
+			$s = iri($row{s});
+		}
+	}
+	if ($row{p}) {
+		$p = iri($row{p});
+	}
+	if ($row{o}) {
+		if ($row{oisblank}) {
+			$o = blank($row{o});
+		} elsif ($row{oisiri}) {
+			$o = iri($row{o});
+		} elsif ($row{oisliteral}) {
+			if ($row{datatype}) {
+				$o = dtliteral($row{o}, $row{datatype});
+			} elsif ($row{lang}) {
+				$o = langliteral($row{o}, $row{lang});
+			} else { # TODO: This shouldn't really happen, with RDF 1.1 semantics?
+				$o = literal($row{o});
+			} # TODO: croak if both datatype and language
+		}
+	}
+	if ($row{g}) {
+		$g = iri($row{g});
 	}
 	return quad($s, $p, $o, $g);
 }
