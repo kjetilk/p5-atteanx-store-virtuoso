@@ -24,6 +24,9 @@ use strict;
 use warnings;
 use Test::More;
 
+note ("There really aren't any meaningful tests for this module.");
+note ("A working Virtuoso install is needed to test it, and it is difficult to do automatically, so the main tests are in xt/");
+
 use_ok('AtteanX::Store::Virtuoso');
 
 done_testing;
