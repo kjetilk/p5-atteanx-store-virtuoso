@@ -68,18 +68,19 @@ sub get_quads {
 	my @out = @_;
 	my ($s, $p, $o, $g) = @out;
 	my @proj;
+	# TODO: sanitize against SQL injection
 	my @where;
 	if ((!(defined($s)) || $s->is_variable || $s->is_blank)) {
 		push(@proj, ('__id2i ( "S" ) AS "s"', 'is_bnode_iri_id ( "S" ) AS "sisblank"'));
 	} else {
 		# Bound IRI assumed
-		push(@where, '"S" = __i2idn ( __bft( ' . $s->value . '))');
+		push(@where, '"S" = __i2idn ( __bft( \'' . $s->value . '\' ))');
 	}
 	if ((!(defined($p)) || $p->is_variable || $p->is_blank)) {
 		push(@proj, '__id2i ( "P" ) AS "p"');
 	} else {
 		# Bound IRI assumed
-		push(@where, '"P" = __i2idn ( __bft( ' . $p->value . '))');
+		push(@where, '"P" = __i2idn ( __bft( \'' . $p->value . '\' ))');
 	}
 	if ((!(defined($o)) || $o->is_variable || $o->is_blank)) {
 		push(@proj, ('__ro2sq ( "O" ) AS "o"',
@@ -107,7 +108,7 @@ sub get_quads {
 		push(@proj, '__id2i ( "G" ) AS "g"');
 	} else {
 		# Bound IRI assumed
-		push(@where, '"G" = __i2idn ( __bft( ' . $g->value . '))');
+		push(@where, '"G" = __i2idn ( __bft( \'' . $g->value . '\' ))');
 	}
 
 	my $sqlquery = "SELECT\n\t" . join(",\n\t", @proj) . "\nFROM DB.DBA.RDF_QUAD\nWHERE\n\t";
@@ -125,7 +126,7 @@ sub get_quads {
 		my $sub	= sub {
 			return unless ($ok);
 			if (my $row	= $sth->fetchrow_hashref) {
-				return $self->_get_quad(@out, %$row);
+				return $self->_get_quad($row, @out);
 			}
 			$ok = 0;
 			return;
@@ -136,7 +137,10 @@ sub get_quads {
 }
 
 sub _get_quad {
-	my ($self, $s, $p, $o, $g, %row) = @_;
+	my $self = shift;
+#	warn Data::Dumper::Dumper(\@_);
+	my $row = shift;
+	my ($s, $p, $o, $g) = @_;
 	# The idea here is that if the row returned from the database
 	# contains an entry for each of the subject, predicate, object or
 	# graph, then it has been a result of a variable, and so that is
@@ -144,36 +148,37 @@ sub _get_quad {
 	# which has been passed in the @out array to this method, and then
 	# we can reuse that object
 
-	warn Data::Dumper::Dumper(\%row);
-	if ($row{s}) {
-		if ($row{sisblank}) {
-			$s = blank($row{s});
+	if ($row->{s}) {
+		if ($row->{sisblank}) {
+			$s = blank($row->{s});
 		} else {
-			$s = iri($row{s});
+			$s = iri($row->{s});
 		}
 	}
-	if ($row{p}) {
-		$p = iri($row{p});
+	if ($row->{p}) {
+		$p = iri($row->{p});
 	}
-	if ($row{o}) {
-		if ($row{oisblank}) {
-			$o = blank($row{o});
-		} elsif ($row{oisiri}) {
-			$o = iri($row{o});
-		} elsif ($row{oisliteral}) {
-			if ($row{datatype}) {
-				$o = dtliteral($row{o}, $row{datatype});
-			} elsif ($row{lang}) {
-				$o = langliteral($row{o}, $row{lang});
+	if ($row->{o}) {
+		if ($row->{oisblank}) {
+			$o = blank($row->{o});
+		} elsif ($row->{oisiri}) {
+			$o = iri($row->{o});
+		} elsif ($row->{oisliteral}) {
+			if ($row->{datatype}) {
+				$o = dtliteral($row->{o}, $row->{datatype});
+			} elsif ($row->{lang}) {
+				$o = langliteral($row->{o}, $row->{lang});
 			} else { # TODO: This shouldn't really happen, with RDF 1.1 semantics?
-				$o = literal($row{o});
+				$o = literal($row->{o});
 			} # TODO: croak if both datatype and language
 		}
 	}
-	if ($row{g}) {
-		$g = iri($row{g});
+	if ($row->{g}) {
+		$g = iri($row->{g});
 	}
-	return quad($s, $p, $o, $g);
+	my $q = quad($s, $p, $o, $g);
+#	warn $q->as_string;
+	return $q;
 }
 
 sub size {

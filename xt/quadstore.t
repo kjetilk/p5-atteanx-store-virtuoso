@@ -46,7 +46,7 @@ sub create_store {
 
 before 'cleanup_store' => sub {
 	my ($self, $store) = @_;
-	$store->_dbh->do("DELETE FROM DB.DBA.RDF_QUAD WHERE G " . $store->_internal_graphs);
+	$store->_dbh->do("DELETE FROM DB.DBA.RDF_QUAD WHERE " . $store->_internal_graphs);
 };
 
 run_me;
