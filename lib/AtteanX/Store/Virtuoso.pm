@@ -32,6 +32,8 @@ has 'base_uri' => (is => 'ro', isa => InstanceOf['Attean::IRI'], predicate => 1,
 
 has 'parse_flags' => (is => 'ro', isa => Int, predicate => 1, default => 512);
 
+has '_internal_graphs' => (is => 'ro', isa => Str, default => "NOT G IN (   __i2idn ( __bft('http://www.w3.org/ns/ldp#')) ,  __i2idn ( __bft('http://localhost:8890/DAV/')), __i2idn ( __bft('http://localhost:8890/sparql')), __i2idn ( __bft('http://www.openlinksw.com/schemas/virtrdf#')))");
+
 sub BUILD {
 	my ($self, $args) = @_;
 	$self->_dbh; # Connect to the database
@@ -128,11 +130,8 @@ sub _get_quad {
 
 sub size {
 	my $self = shift;
-	my $sqlquery = <<'END';
-SELECT count(*) FROM DB.DBA.RDF_QUAD
-END
-	my $size = $self->_dbh->selectall_arrayref($sqlquery);
-	warn Data::Dumper::Dumper($size);
+	my $sqlquery = 'SELECT count(*) FROM DB.DBA.RDF_QUAD WHERE ' . $self->_internal_graphs;
+	my ($size) = $self->_dbh->selectrow_array($sqlquery);
 	return $size;
 }
 

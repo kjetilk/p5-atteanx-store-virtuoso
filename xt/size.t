@@ -21,3 +21,5 @@ END
 	does_ok($store, 'Attean::API::QuadStore');
 	is($store->size, 3, 'Reports correct size');
 }
+
+done_testing;
