@@ -121,19 +121,18 @@ sub get_quads {
 
 	$self->log->debug("Preparing query:\n$sqlquery");
 	my $sth = $self->_dbh->prepare($sqlquery);
-		$sth->execute();
-		my $ok	= 1;
-		my $sub	= sub {
-			return unless ($ok);
-			if (my $row	= $sth->fetchrow_hashref) {
-				return $self->_get_quad($row, @out);
+	$sth->execute();
+	my $ok	= 1;
+	my $sub	= sub {
+		return unless ($ok);
+		if (my $row	= $sth->fetchrow_hashref) {
+			return $self->_get_quad($row, @out);
 			}
-			$ok = 0;
-			return;
-		};
-		my $iter	= Attean::CodeIterator->new( generator => $sub, item_type => 'Attean::API::Quad' );
-		return $iter;
-
+		$ok = 0;
+		return;
+	};
+	my $iter	= Attean::CodeIterator->new( generator => $sub, item_type => 'Attean::API::Quad' );
+	return $iter;
 }
 
 sub _get_quad {
